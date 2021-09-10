@@ -4,7 +4,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/sfreiberg/gotwilio"
+	"github.com/admpub/gotwilio"
 
 	"github.com/coscms/sms"
 	"github.com/webx-top/com"
