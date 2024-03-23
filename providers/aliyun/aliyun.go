@@ -3,7 +3,7 @@ package aliyun
 import (
 	"errors"
 
-	app "github.com/KenmyZhang/aliyun-communicate"
+	"github.com/aliyun/alibaba-cloud-sdk-go/services/dysmsapi"
 	"github.com/coscms/sms"
 	"github.com/webx-top/com"
 )
@@ -12,17 +12,17 @@ var _ sms.Sender = &Aliyun{}
 
 func New() *Aliyun {
 	return &Aliyun{
-		GatewayURL: `http://dysmsapi.aliyuncs.com/`,
+		RegionId: `cn-hangzhou`,
 	}
 }
 
 type Aliyun struct {
-	GatewayURL   string
+	RegionId     string
 	AccessKey    string
 	AccessSecret string
 	SignName     string //默认签名
 	TmplCode     string //默认模板代码
-	client       *app.SmsClient
+	client       *dysmsapi.Client
 }
 
 func (a *Aliyun) Send(c *sms.Config) error {
@@ -36,21 +36,29 @@ func (a *Aliyun) Send(c *sms.Config) error {
 		signName = a.SignName
 	}
 	if a.client == nil {
-		a.client = app.New(a.GatewayURL)
+		var err error
+		a.client, err = dysmsapi.NewClientWithAccessKey(a.RegionId, a.AccessKey, a.AccessSecret)
+		if err != nil {
+			return err
+		}
 	}
 	b, e := com.JSONEncode(c.ExtraData)
 	if e != nil {
 		return e
 	}
-	result, err := a.client.Execute(a.AccessKey, a.AccessSecret, c.Mobile, signName, tmplCode, string(b))
+	request := dysmsapi.CreateSendSmsRequest()
+	request.Scheme = "https"
+	request.PhoneNumbers = c.Mobile   //手机号变量值
+	request.SignName = signName       //签名
+	request.TemplateCode = tmplCode   //模板编码
+	request.TemplateParam = string(b) //"{\"code\":\"" + code + "\"}"
+	response, err := a.client.SendSms(request)
 	if err != nil {
 		return err
 	}
-	if result.IsSuccessful() {
+	if response.IsSuccess() {
 		return nil
 	}
-	if result.Message == `OK` {
-		return nil
-	}
-	return errors.New(`AliyunSMS: ` + result.Message)
+	// if response.Code == "isv.BUSINESS_LIMIT_CONTROL" {}
+	return errors.New(`AliyunSMS: ` + response.Message)
 }
